@@ -18,7 +18,7 @@ import os
 import warnings
 
 import torch
-from sympy import Symbol, Eq, Abs, tanh, Or, And
+from sympy import Symbol, Eq, Abs, tanh, exp, Or, And
 import itertools
 import numpy as np
 
@@ -145,8 +145,11 @@ def run(cfg: ModulusConfig) -> None:
 
     # params for simulation
     # heat params
+    alpha = 0.4
+    P = 100_000
     inlet_t = 293.15 / 273.15 - 1.0
     grad_t = 360 / 273.15
+    grad_t = alpha * P/(np.pi * source_dim[0]**2)
 
     # make flow domain
     thermal_domain = Domain()
@@ -205,7 +208,7 @@ def run(cfg: ModulusConfig) -> None:
     )
     thermal_domain.add_constraint(fluid_solid_interface, "fluid_solid_interface")
 
-    # heat source
+    # heat source is given as surface heat with square distribution
     sharpen_tanh = 60.0
     source_func_xl = (tanh(sharpen_tanh * (x - source_origin[0])) + 1.0) / 2.0
     source_func_xh = (
@@ -218,6 +221,15 @@ def run(cfg: ModulusConfig) -> None:
     gradient_normal = (
         grad_t * source_func_xl * source_func_xh * source_func_zl * source_func_zh
     )
+
+    source_func_z = exp(-(z-source_origin[2])**2/(2*source_dim[2]**2))
+    source_func_x = exp(-(x-source_origin[0])**2/(2*source_dim[0]**2))
+
+    # laser heat source
+    gradient_normal = (
+        grad_t * source_func_z * source_func_x
+    )
+
     heat_source = PointwiseBoundaryConstraint(
         nodes=thermal_nodes,
         geometry=geo.three_fin,
